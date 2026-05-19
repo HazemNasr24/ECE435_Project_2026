@@ -1,0 +1,939 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>LULC Classifier — ECE 435 | Group 4</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet"/>
+<style>
+/* ── Reset & Root ── */
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#07090f;
+  --surf:#0e1420;
+  --card:#121b2b;
+  --card2:#161f30;
+  --border:#1d2d45;
+  --border2:#243450;
+  --accent:#00e5ff;
+  --accent2:#a855f7;
+  --green:#22c55e;
+  --red:#ef4444;
+  --yellow:#eab308;
+  --text:#dde9ff;
+  --muted:#5e78a0;
+  --water:#0055FF;
+  --veg:#228B22;
+  --urban:#E60000;
+  --desert:#FFD700;
+  --r:16px;
+}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:'Syne',sans-serif;
+     min-height:100vh;overflow-x:hidden}
+
+/* ── Ambient background ── */
+body::before{
+  content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+  background:
+    radial-gradient(ellipse 70% 45% at 15% 5%,  rgba(0,229,255,.06) 0%, transparent 65%),
+    radial-gradient(ellipse 55% 40% at 85% 90%, rgba(168,85,247,.07) 0%, transparent 65%),
+    radial-gradient(ellipse 40% 30% at 50% 50%, rgba(34,197,94,.03) 0%, transparent 60%);
+}
+
+/* ── Layout ── */
+.wrap{position:relative;z-index:1;max-width:1200px;margin:0 auto;padding:0 20px 80px}
+
+/* ── Header ── */
+header{padding:48px 0 40px;text-align:center}
+.eyebrow{
+  display:inline-flex;align-items:center;gap:8px;
+  font-family:'Space Mono',monospace;font-size:10px;letter-spacing:.18em;
+  text-transform:uppercase;color:var(--accent);
+  background:rgba(0,229,255,.07);border:1px solid rgba(0,229,255,.2);
+  padding:6px 14px;border-radius:99px;margin-bottom:20px;
+}
+.eyebrow-dot{width:6px;height:6px;border-radius:50%;background:var(--accent);
+             box-shadow:0 0 8px var(--accent);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+h1{font-size:clamp(30px,5vw,58px);font-weight:800;line-height:1.08;margin-bottom:14px;
+   background:linear-gradient(135deg,#ffffff 20%,var(--accent) 60%,var(--accent2) 100%);
+   -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.sub{color:var(--muted);font-size:15px;max-width:560px;margin:0 auto;line-height:1.7}
+
+/* ── Steps nav ── */
+.steps-nav{
+  display:flex;align-items:center;justify-content:center;
+  gap:0;margin:40px 0 36px;flex-wrap:wrap;row-gap:8px;
+}
+.step-btn{
+  display:flex;align-items:center;gap:10px;
+  background:var(--card);border:1px solid var(--border);
+  color:var(--muted);padding:10px 20px;
+  font-family:'Space Mono',monospace;font-size:11px;letter-spacing:.06em;
+  cursor:pointer;transition:all .25s;position:relative;
+  white-space:nowrap;
+}
+.step-btn:first-child{border-radius:10px 0 0 10px}
+.step-btn:last-child{border-radius:0 10px 10px 0}
+.step-btn:not(:last-child)::after{
+  content:'→';position:absolute;right:-14px;z-index:2;
+  color:var(--border2);font-size:13px;
+}
+.step-btn.active{background:rgba(0,229,255,.1);border-color:var(--accent);color:var(--accent)}
+.step-btn.done{background:rgba(34,197,94,.07);border-color:rgba(34,197,94,.3);color:var(--green)}
+.step-num{
+  width:22px;height:22px;border-radius:50%;
+  background:var(--border);font-size:10px;font-weight:700;
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+}
+.step-btn.active .step-num{background:var(--accent);color:#000}
+.step-btn.done .step-num{background:var(--green);color:#000}
+
+/* ── Cards ── */
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:28px;margin-bottom:20px}
+.card-header{display:flex;align-items:center;gap:10px;margin-bottom:22px}
+.card-tag{
+  font-family:'Space Mono',monospace;font-size:10px;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--accent);
+  background:rgba(0,229,255,.08);border:1px solid rgba(0,229,255,.2);
+  padding:3px 10px;border-radius:99px;
+}
+.card-title{font-size:16px;font-weight:700;color:var(--text)}
+
+/* ── File Upload Grid ── */
+.band-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
+@media(max-width:700px){.band-grid{grid-template-columns:repeat(2,1fr)}}
+.band-item{position:relative}
+.band-drop{
+  border:1.5px dashed var(--border2);border-radius:10px;
+  padding:16px 10px;text-align:center;cursor:pointer;
+  transition:all .2s;background:var(--card2);
+}
+.band-drop:hover,.band-drop.has-file{border-color:var(--accent);background:rgba(0,229,255,.05)}
+.band-drop input[type=file]{
+  position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;
+}
+.band-drop .band-icon{font-size:22px;margin-bottom:6px}
+.band-drop .band-name{font-family:'Space Mono',monospace;font-size:10px;color:var(--accent);font-weight:700}
+.band-drop .band-desc{font-size:10px;color:var(--muted);margin-top:3px}
+.band-drop .file-ok{font-size:10px;color:var(--green);margin-top:4px;display:none}
+.band-drop.has-file .file-ok{display:block}
+.band-drop.has-file .band-icon::after{content:' ✓'}
+
+/* MTL row */
+.mtl-row{
+  border:1.5px dashed var(--border2);border-radius:10px;padding:16px 20px;
+  display:flex;align-items:center;gap:16px;cursor:pointer;
+  transition:all .2s;background:var(--card2);position:relative;
+}
+.mtl-row:hover,.mtl-row.has-file{border-color:var(--accent2);background:rgba(168,85,247,.06)}
+.mtl-row input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.mtl-icon{font-size:28px;flex-shrink:0}
+.mtl-info .mtl-label{font-size:13px;font-weight:700;color:var(--text)}
+.mtl-info .mtl-sub{font-size:11px;color:var(--muted);margin-top:3px}
+.mtl-ok{margin-left:auto;color:var(--green);font-size:12px;font-family:'Space Mono',monospace;display:none}
+.mtl-row.has-file .mtl-ok{display:block}
+
+/* ── Buttons ── */
+.btn{
+  display:inline-flex;align-items:center;gap:8px;
+  font-family:'Syne',sans-serif;font-size:14px;font-weight:700;
+  letter-spacing:.04em;padding:12px 26px;border-radius:10px;
+  cursor:pointer;border:none;transition:all .2s;
+}
+.btn-primary{background:linear-gradient(135deg,var(--accent2),var(--accent));color:#000}
+.btn-primary:hover{opacity:.88;transform:translateY(-1px)}
+.btn-primary:disabled{opacity:.35;cursor:not-allowed;transform:none}
+.btn-outline{background:transparent;border:1px solid var(--border2);color:var(--text)}
+.btn-outline:hover{border-color:var(--accent);color:var(--accent)}
+.btn-green{background:rgba(34,197,94,.15);border:1px solid rgba(34,197,94,.3);color:var(--green)}
+.btn-green:hover{background:rgba(34,197,94,.25)}
+.btn-full{width:100%;justify-content:center}
+
+/* ── Metadata table ── */
+.meta-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:600px){.meta-grid{grid-template-columns:1fr}}
+.meta-item{background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:12px 16px}
+.meta-key{font-family:'Space Mono',monospace;font-size:9px;letter-spacing:.1em;
+          text-transform:uppercase;color:var(--muted);margin-bottom:4px}
+.meta-val{font-size:14px;font-weight:600;color:var(--text);word-break:break-all}
+
+/* Calibration table */
+.cal-table{width:100%;border-collapse:collapse;font-family:'Space Mono',monospace;font-size:11px;margin-top:14px}
+.cal-table th{background:var(--card2);padding:8px 14px;text-align:left;
+              color:var(--muted);font-size:9px;letter-spacing:.1em;text-transform:uppercase;
+              border-bottom:1px solid var(--border)}
+.cal-table td{padding:8px 14px;border-bottom:1px solid var(--border);color:var(--text)}
+.cal-table tr:last-child td{border-bottom:none}
+.cal-table tr:hover td{background:rgba(255,255,255,.02)}
+.band-pill{
+  display:inline-block;background:rgba(0,229,255,.1);border:1px solid rgba(0,229,255,.25);
+  color:var(--accent);border-radius:6px;padding:2px 10px;font-size:10px;font-weight:700;
+}
+
+/* ── Subset controls ── */
+.subset-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px}
+@media(max-width:560px){.subset-grid{grid-template-columns:1fr}}
+.input-group label{
+  display:block;font-family:'Space Mono',monospace;font-size:10px;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--muted);margin-bottom:6px;
+}
+.input-group input{
+  width:100%;background:var(--card2);border:1px solid var(--border2);
+  color:var(--text);font-family:'Space Mono',monospace;font-size:13px;
+  padding:10px 14px;border-radius:8px;outline:none;transition:border-color .2s;
+}
+.input-group input:focus{border-color:var(--accent)}
+.subset-info{
+  background:rgba(0,229,255,.06);border:1px solid rgba(0,229,255,.2);
+  border-radius:10px;padding:14px 18px;display:flex;gap:24px;flex-wrap:wrap;margin-bottom:20px;
+}
+.subset-info-item .si-val{font-family:'Space Mono',monospace;font-size:14px;font-weight:700;color:var(--accent)}
+.subset-info-item .si-key{font-size:10px;color:var(--muted);margin-top:2px}
+
+/* ── Preview images ── */
+.preview-row{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:20px}
+@media(max-width:600px){.preview-row{grid-template-columns:1fr}}
+.preview-box{border-radius:12px;overflow:hidden;border:1px solid var(--border)}
+.preview-box img{width:100%;height:220px;object-fit:cover;display:block}
+.preview-label{background:var(--card2);padding:8px 14px;font-family:'Space Mono',monospace;
+               font-size:10px;color:var(--muted);text-align:center}
+
+/* ── Indices ── */
+.indices-row{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:20px}
+@media(max-width:600px){.indices-row{grid-template-columns:1fr}}
+.index-box{border-radius:12px;overflow:hidden;border:1px solid var(--border);background:var(--card2)}
+.index-box img{width:100%;height:180px;object-fit:cover;display:block}
+.index-label{padding:10px 14px}
+.index-name{font-family:'Space Mono',monospace;font-size:11px;font-weight:700;color:var(--accent)}
+.index-desc{font-size:11px;color:var(--muted);margin-top:2px}
+
+/* ── Result map ── */
+.result-map{
+  border-radius:14px;overflow:hidden;border:1px solid var(--border);
+  margin-bottom:24px;
+}
+.result-map img{width:100%;display:block;max-height:600px;object-fit:contain;background:#0d0d0d}
+
+/* ── Stats table ── */
+.stats-table{width:100%;border-collapse:collapse;margin-top:4px}
+.stats-table th{
+  background:var(--card2);padding:10px 16px;text-align:left;
+  font-family:'Space Mono',monospace;font-size:9px;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);
+}
+.stats-table td{padding:12px 16px;border-bottom:1px solid var(--border);font-size:13px}
+.stats-table tr:last-child td{border-bottom:none}
+.stats-table tr:hover td{background:rgba(255,255,255,.02)}
+.class-dot{width:12px;height:12px;border-radius:3px;display:inline-block;margin-right:8px;vertical-align:middle}
+.bar-cell{width:140px}
+.bar-bg{background:var(--border);border-radius:99px;height:6px;overflow:hidden}
+.bar-fill{height:100%;border-radius:99px;transition:width .6s ease}
+
+/* ── Model upload ── */
+.model-row{
+  border:1.5px dashed var(--border2);border-radius:10px;padding:14px 18px;
+  display:flex;align-items:center;gap:14px;cursor:pointer;
+  transition:all .2s;background:var(--card2);position:relative;margin-bottom:18px;
+}
+.model-row:hover,.model-row.has-file{border-color:var(--accent2);background:rgba(168,85,247,.06)}
+.model-row input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.model-ok{margin-left:auto;font-size:11px;color:var(--green);font-family:'Space Mono',monospace;display:none}
+.model-row.has-file .model-ok{display:block}
+
+/* ── Spinner / Progress ── */
+.spinner{
+  display:none;width:40px;height:40px;border-radius:50%;
+  border:3px solid var(--border);border-top-color:var(--accent);
+  animation:spin .8s linear infinite;margin:0 auto;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-wrap{text-align:center;padding:32px 0;display:none}
+.loading-msg{font-family:'Space Mono',monospace;font-size:12px;color:var(--muted);
+             margin-top:14px;letter-spacing:.06em}
+
+/* ── Alerts ── */
+.alert{padding:12px 18px;border-radius:10px;font-size:13px;margin-bottom:16px;display:none}
+.alert.error{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:#fca5a5}
+.alert.success{background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);color:#86efac}
+.alert.show{display:block}
+
+/* ── Section visibility ── */
+.step-section{display:none}
+.step-section.active{display:block;animation:fadeIn .3s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+/* ── Separator ── */
+.sep{border:none;border-top:1px solid var(--border);margin:24px 0}
+
+/* ── Pill tags ── */
+.pill{
+  display:inline-flex;align-items:center;gap:5px;
+  background:rgba(255,255,255,.05);border:1px solid var(--border2);
+  font-family:'Space Mono',monospace;font-size:10px;color:var(--muted);
+  padding:4px 10px;border-radius:99px;
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- Header -->
+  <header>
+    <div class="eyebrow"><span class="eyebrow-dot"></span>ECE 435 · Remote Sensing · Group 8</div>
+    <h1>LULC Classification<br>Pipeline</h1>
+    <p class="sub">Land Use / Land Cover mapping from Landsat 8 — Radiometric Calibration → Spectral Indices → Machine Learning Classification</p>
+  </header>
+
+  <!-- Step navigation -->
+  <nav class="steps-nav">
+    <button class="step-btn active" onclick="gotoStep(1)" id="nav1">
+      <span class="step-num">1</span>Upload &amp; Metadata
+    </button>
+    <button class="step-btn" onclick="gotoStep(2)" id="nav2">
+      <span class="step-num">2</span>Spatial Subset
+    </button>
+    <button class="step-btn" onclick="gotoStep(3)" id="nav3">
+      <span class="step-num">3</span>Classify
+    </button>
+    <button class="step-btn" onclick="gotoStep(4)" id="nav4">
+      <span class="step-num">4</span>Results
+    </button>
+  </nav>
+
+  <!-- ════════════════════════════════════════════════════════ -->
+  <!--  STEP 1 — Upload                                        -->
+  <!-- ════════════════════════════════════════════════════════ -->
+  <section class="step-section active" id="step1">
+
+    <div class="card">
+      <div class="card-header">
+        <span class="card-tag">Step 1</span>
+        <span class="card-title">Upload Landsat 8 Bands (B1–B7) + MTL Metadata</span>
+      </div>
+
+      <div class="alert error" id="uploadErr"></div>
+
+      <!-- Band upload grid -->
+      <div class="band-grid">
+        <div class="band-item" id="drop_band1">
+          <div class="band-drop" id="bd1">
+            <input type="file" accept=".tif,.tiff" onchange="markBand(1,this)">
+            <div class="band-icon">🌊</div>
+            <div class="band-name">Band 1</div>
+            <div class="band-desc">Coastal / Aerosol</div>
+            <div class="file-ok">✓ Loaded</div>
+          </div>
+        </div>
+        <div class="band-item">
+          <div class="band-drop" id="bd2">
+            <input type="file" accept=".tif,.tiff" onchange="markBand(2,this)">
+            <div class="band-icon">🔵</div>
+            <div class="band-name">Band 2</div>
+            <div class="band-desc">Blue (0.45–0.51µm)</div>
+            <div class="file-ok">✓ Loaded</div>
+          </div>
+        </div>
+        <div class="band-item">
+          <div class="band-drop" id="bd3">
+            <input type="file" accept=".tif,.tiff" onchange="markBand(3,this)">
+            <div class="band-icon">🟢</div>
+            <div class="band-name">Band 3</div>
+            <div class="band-desc">Green (0.53–0.59µm)</div>
+            <div class="file-ok">✓ Loaded</div>
+          </div>
+        </div>
+        <div class="band-item">
+          <div class="band-drop" id="bd4">
+            <input type="file" accept=".tif,.tiff" onchange="markBand(4,this)">
+            <div class="band-icon">🔴</div>
+            <div class="band-name">Band 4</div>
+            <div class="band-desc">Red (0.64–0.67µm)</div>
+            <div class="file-ok">✓ Loaded</div>
+          </div>
+        </div>
+        <div class="band-item">
+          <div class="band-drop" id="bd5">
+            <input type="file" accept=".tif,.tiff" onchange="markBand(5,this)">
+            <div class="band-icon">🌿</div>
+            <div class="band-name">Band 5</div>
+            <div class="band-desc">NIR (0.85–0.88µm)</div>
+            <div class="file-ok">✓ Loaded</div>
+          </div>
+        </div>
+        <div class="band-item">
+          <div class="band-drop" id="bd6">
+            <input type="file" accept=".tif,.tiff" onchange="markBand(6,this)">
+            <div class="band-icon">🟠</div>
+            <div class="band-name">Band 6</div>
+            <div class="band-desc">SWIR1 (1.57–1.65µm)</div>
+            <div class="file-ok">✓ Loaded</div>
+          </div>
+        </div>
+        <div class="band-item">
+          <div class="band-drop" id="bd7">
+            <input type="file" accept=".tif,.tiff" onchange="markBand(7,this)">
+            <div class="band-icon">🟤</div>
+            <div class="band-name">Band 7</div>
+            <div class="band-desc">SWIR2 (2.11–2.29µm)</div>
+            <div class="file-ok">✓ Loaded</div>
+          </div>
+        </div>
+        <!-- MTL in last cell -->
+        <div class="band-item" style="grid-column:span 1">
+          <div class="band-drop" id="bdMTL" style="border-color:rgba(168,85,247,.4)">
+            <input type="file" accept=".txt" onchange="markMTL(this)">
+            <div class="band-icon">📋</div>
+            <div class="band-name" style="color:var(--accent2)">MTL.txt</div>
+            <div class="band-desc">Metadata file</div>
+            <div class="file-ok">✓ Loaded</div>
+          </div>
+        </div>
+      </div>
+
+      <button class="btn btn-primary btn-full" id="uploadBtn" onclick="doUpload()">
+        🚀 Load Image &amp; Parse Metadata
+      </button>
+
+      <div class="loading-wrap" id="uploadLoading">
+        <div class="spinner" style="display:block"></div>
+        <div class="loading-msg">Reading bands and parsing MTL coefficients…</div>
+      </div>
+    </div>
+
+    <!-- Metadata result (hidden until upload) -->
+    <div class="card" id="metaCard" style="display:none">
+      <div class="card-header">
+        <span class="card-tag" style="color:var(--green);background:rgba(34,197,94,.08);border-color:rgba(34,197,94,.2)">Metadata</span>
+        <span class="card-title">Scene Information</span>
+      </div>
+      <div class="meta-grid" id="metaGrid"></div>
+
+      <hr class="sep">
+
+      <div class="card-header" style="margin-bottom:10px">
+        <span class="card-tag">Radiometric</span>
+        <span class="card-title" style="font-size:14px">TOA Calibration Coefficients (from MTL)</span>
+      </div>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:4px">
+        Formula applied per band:
+        <code style="background:var(--card2);padding:3px 8px;border-radius:6px;font-family:'Space Mono',monospace;color:var(--accent)">
+          ρ = (M × DN + A) / sin(Sun_Elevation)
+        </code>
+      </p>
+      <table class="cal-table" id="calTable">
+        <thead><tr><th>Band</th><th>Role</th><th>M (Mult)</th><th>A (Add)</th></tr></thead>
+        <tbody></tbody>
+      </table>
+
+      <hr class="sep">
+      <button class="btn btn-primary" onclick="gotoStep(2)" style="margin-top:4px">
+        Next: Select Spatial Subset →
+      </button>
+    </div>
+  </section>
+
+  <!-- ════════════════════════════════════════════════════════ -->
+  <!--  STEP 2 — Spatial Subset                                -->
+  <!-- ════════════════════════════════════════════════════════ -->
+  <section class="step-section" id="step2">
+    <div class="card">
+      <div class="card-header">
+        <span class="card-tag">Step 2</span>
+        <span class="card-title">Select Spatial Subset (Pixel Crop)</span>
+      </div>
+
+      <p style="font-size:13px;color:var(--muted);margin-bottom:20px;line-height:1.7">
+        Choose which portion of the full image to classify. Default values crop to the
+        project specification (rows 1000–3000, cols 1000–3000 → 2000×2000 pixels ≈ 3,600 km²).
+        Adjust freely for any region of interest.
+      </p>
+
+      <div id="dimInfo" style="margin-bottom:18px"></div>
+
+      <div class="subset-grid">
+        <div class="input-group">
+          <label>Row Start</label>
+          <input type="number" id="rowStart" value="1000" min="0" oninput="updateSubsetInfo()">
+        </div>
+        <div class="input-group">
+          <label>Row End</label>
+          <input type="number" id="rowEnd" value="3000" min="1" oninput="updateSubsetInfo()">
+        </div>
+        <div class="input-group">
+          <label>Col Start</label>
+          <input type="number" id="colStart" value="1000" min="0" oninput="updateSubsetInfo()">
+        </div>
+        <div class="input-group">
+          <label>Col End</label>
+          <input type="number" id="colEnd" value="3000" min="1" oninput="updateSubsetInfo()">
+        </div>
+      </div>
+
+      <div class="subset-info" id="subsetInfo">
+        <div class="subset-info-item">
+          <div class="si-val" id="si_size">2000 × 2000</div>
+          <div class="si-key">Image Size (px)</div>
+        </div>
+        <div class="subset-info-item">
+          <div class="si-val" id="si_px">4,000,000</div>
+          <div class="si-key">Total Pixels</div>
+        </div>
+        <div class="subset-info-item">
+          <div class="si-val" id="si_area">3,600 km²</div>
+          <div class="si-key">Area Covered</div>
+        </div>
+      </div>
+
+      <button class="btn btn-outline btn-full" style="margin-bottom:12px" onclick="doPreview()">
+        👁 Generate Preview (True Color + False Color)
+      </button>
+
+      <div class="loading-wrap" id="previewLoading">
+        <div class="spinner" style="display:block"></div>
+        <div class="loading-msg">Loading bands and applying TOA calibration for preview…</div>
+      </div>
+
+      <div id="previewResult" style="display:none">
+        <div class="preview-row">
+          <div class="preview-box">
+            <img id="previewRGB" src="" alt="True Color">
+            <div class="preview-label">True Color (B4-B3-B2)</div>
+          </div>
+          <div class="preview-box">
+            <img id="previewFalse" src="" alt="False Color">
+            <div class="preview-label">False Color / NIR (B5-B4-B3)</div>
+          </div>
+        </div>
+        <hr class="sep">
+        <button class="btn btn-primary" onclick="gotoStep(3)">Next: Classify → </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ════════════════════════════════════════════════════════ -->
+  <!--  STEP 3 — Classify                                      -->
+  <!-- ════════════════════════════════════════════════════════ -->
+  <section class="step-section" id="step3">
+    <div class="card">
+      <div class="card-header">
+        <span class="card-tag">Step 3</span>
+        <span class="card-title">Run Full Classification Pipeline</span>
+      </div>
+
+      <p style="font-size:13px;color:var(--muted);margin-bottom:20px;line-height:1.7">
+        Upload your trained model (<code style="color:var(--accent)">best_model.pkl</code>) or leave
+        empty to auto-detect it from the project <code style="color:var(--accent)">Outputs/</code> folder.
+        The pipeline will run: TOA Calibration → NDVI / MNDWI / NDBI → 10-feature stack → Predict.
+      </p>
+
+      <!-- Model upload -->
+      <div class="model-row" id="modelRow">
+        <input type="file" accept=".pkl" onchange="markModel(this)">
+        <span style="font-size:24px">🧠</span>
+        <div>
+          <div style="font-weight:700;font-size:13px">best_model.pkl</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px">Click to upload trained model (optional if auto-detected)</div>
+        </div>
+        <div class="model-ok">✓ Model ready</div>
+      </div>
+
+      <!-- Pipeline steps visual -->
+      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:22px">
+        <span class="pill">🛰 Load 7 Bands</span>
+        <span style="color:var(--muted)">→</span>
+        <span class="pill">📡 TOA Calibration</span>
+        <span style="color:var(--muted)">→</span>
+        <span class="pill">🌿 NDVI</span>
+        <span style="color:var(--muted)">+</span>
+        <span class="pill">💧 MNDWI</span>
+        <span style="color:var(--muted)">+</span>
+        <span class="pill">🏙 NDBI</span>
+        <span style="color:var(--muted)">→</span>
+        <span class="pill">📦 10-Feature Stack</span>
+        <span style="color:var(--muted)">→</span>
+        <span class="pill">🤖 ML Predict</span>
+        <span style="color:var(--muted)">→</span>
+        <span class="pill">🗺 Map</span>
+      </div>
+
+      <div class="alert error" id="classifyErr"></div>
+
+      <button class="btn btn-primary btn-full" id="classifyBtn" onclick="doClassify()">
+        ⚡ Run Classification Pipeline
+      </button>
+
+      <div class="loading-wrap" id="classifyLoading">
+        <div class="spinner" style="display:block"></div>
+        <div class="loading-msg" id="classifyMsg">Applying radiometric calibration…</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ════════════════════════════════════════════════════════ -->
+  <!--  STEP 4 — Results                                       -->
+  <!-- ════════════════════════════════════════════════════════ -->
+  <section class="step-section" id="step4">
+
+    <!-- Classification map -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-tag" style="color:var(--green);background:rgba(34,197,94,.08);border-color:rgba(34,197,94,.2)">Output</span>
+        <span class="card-title">Classification Map</span>
+      </div>
+      <div class="result-map">
+        <img id="classMap" src="" alt="Classification Map">
+      </div>
+      <div id="subsetSummary" style="font-family:'Space Mono',monospace;font-size:11px;color:var(--muted)"></div>
+    </div>
+
+    <!-- Stats table -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-tag">Statistics</span>
+        <span class="card-title">Area Coverage per Class</span>
+      </div>
+      <table class="stats-table" id="statsTable">
+        <thead>
+          <tr>
+            <th>Class</th>
+            <th>Pixels</th>
+            <th>Area (km²)</th>
+            <th>Coverage</th>
+            <th class="bar-cell"></th>
+          </tr>
+        </thead>
+        <tbody id="statsTbody"></tbody>
+      </table>
+      <hr class="sep">
+      <button class="btn btn-green" onclick="downloadStats()">⬇ Download Stats CSV</button>
+    </div>
+
+    <!-- Spectral indices -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-tag">Indices</span>
+        <span class="card-title">Spectral Index Previews</span>
+      </div>
+      <div class="indices-row">
+        <div class="index-box">
+          <img id="ndviImg" src="" alt="NDVI">
+          <div class="index-label">
+            <div class="index-name">NDVI</div>
+            <div class="index-desc">Normalized Difference Vegetation Index<br>(NIR - Red) / (NIR + Red)</div>
+          </div>
+        </div>
+        <div class="index-box">
+          <img id="ndwiImg" src="" alt="MNDWI">
+          <div class="index-label">
+            <div class="index-name">MNDWI</div>
+            <div class="index-desc">Modified Normalized Difference Water Index<br>(Green - SWIR1) / (Green + SWIR1)</div>
+          </div>
+        </div>
+        <div class="index-box">
+          <img id="ndbiImg" src="" alt="NDBI">
+          <div class="index-label">
+            <div class="index-name">NDBI</div>
+            <div class="index-desc">Normalized Difference Built-up Index<br>(SWIR1 - NIR) / (SWIR1 + NIR)</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <button class="btn btn-outline" onclick="gotoStep(1)">← Start Over</button>
+  </section>
+
+</div><!-- /wrap -->
+
+<script>
+// ── State ──────────────────────────────────────────────────────────────────────
+const state = {
+  files: {},          // { band1: File, ..., band7: File, mtl: File, model: File }
+  meta: null,
+  calibration: null,
+  fullH: 0, fullW: 0,
+  statsData: null,
+};
+
+// ── Navigation ─────────────────────────────────────────────────────────────────
+function gotoStep(n) {
+  document.querySelectorAll('.step-section').forEach(s => s.classList.remove('active'));
+  document.getElementById(`step${n}`).classList.add('active');
+  document.querySelectorAll('.step-btn').forEach((b,i) => {
+    b.classList.remove('active');
+    if (i+1 < n)  b.classList.add('done');
+    if (i+1 === n) b.classList.add('active');
+  });
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+
+// ── Mark files ─────────────────────────────────────────────────────────────────
+function markBand(n, input) {
+  if (!input.files[0]) return;
+  state.files[`band${n}`] = input.files[0];
+  const bd = document.getElementById(`bd${n}`);
+  bd.classList.add('has-file');
+}
+function markMTL(input) {
+  if (!input.files[0]) return;
+  state.files.mtl = input.files[0];
+  document.getElementById('bdMTL').classList.add('has-file');
+}
+function markModel(input) {
+  if (!input.files[0]) return;
+  state.files.model = input.files[0];
+  document.getElementById('modelRow').classList.add('has-file');
+}
+
+// ── STEP 1: Upload ─────────────────────────────────────────────────────────────
+async function doUpload() {
+  const err = document.getElementById('uploadErr');
+  err.classList.remove('show');
+
+  for (let i=1; i<=7; i++) {
+    if (!state.files[`band${i}`]) {
+      showAlert(err, `Please select Band ${i} GeoTIFF`); return;
+    }
+  }
+  if (!state.files.mtl) { showAlert(err, 'Please select MTL.txt'); return; }
+
+  const fd = new FormData();
+  for (let i=1; i<=7; i++) fd.append(`band${i}`, state.files[`band${i}`]);
+  fd.append('mtl', state.files.mtl);
+
+  setLoading('uploadLoading', true);
+  document.getElementById('uploadBtn').disabled = true;
+
+  try {
+    const res = await fetch('/api/upload', {method:'POST', body:fd});
+    const data = await res.json();
+    if (!data.success) { showAlert(err, data.error); return; }
+
+    state.meta = data.meta;
+    state.calibration = data.calibration;
+    state.fullH = data.meta.full_height;
+    state.fullW = data.meta.full_width;
+
+    // Populate metadata card
+    renderMeta(data.meta);
+    renderCalTable(data.calibration);
+    document.getElementById('metaCard').style.display = 'block';
+
+    // Update subset defaults to project spec or full image
+    document.getElementById('rowEnd').max = state.fullH;
+    document.getElementById('colEnd').max = state.fullW;
+    document.getElementById('rowEnd').value = Math.min(3000, state.fullH);
+    document.getElementById('colEnd').value = Math.min(3000, state.fullW);
+    updateSubsetInfo();
+
+    markNavDone(1);
+  } catch(e) {
+    showAlert(err, 'Upload failed: ' + e.message);
+  } finally {
+    setLoading('uploadLoading', false);
+    document.getElementById('uploadBtn').disabled = false;
+  }
+}
+
+function renderMeta(m) {
+  const bandRoles = ['','Coastal/Aerosol','Blue','Green','Red','NIR','SWIR1','SWIR2'];
+  const grid = document.getElementById('metaGrid');
+  const items = [
+    ['Scene ID', m.scene_id],
+    ['Date Acquired', m.date],
+    ['Sensor', m.sensor],
+    ['WRS Path / Row', `${m.path} / ${m.row}`],
+    ['Sun Elevation', `${m.sun_elevation}°`],
+    ['Sun Azimuth', `${m.sun_azimuth}°`],
+    ['Cloud Cover', `${m.cloud_cover}%`],
+    ['CRS', m.crs],
+    ['Pixel Size', `${m.pixel_size_m} m`],
+    ['Full Dimensions', `${m.full_width} × ${m.full_height} px`],
+  ];
+  grid.innerHTML = items.map(([k,v]) => `
+    <div class="meta-item">
+      <div class="meta-key">${k}</div>
+      <div class="meta-val">${v ?? 'N/A'}</div>
+    </div>`).join('');
+}
+
+function renderCalTable(cal) {
+  const roles = ['Coastal/Aerosol','Blue','Green','Red','NIR','SWIR1','SWIR2'];
+  const tbody = document.querySelector('#calTable tbody');
+  tbody.innerHTML = cal.map(c => `
+    <tr>
+      <td><span class="band-pill">B${c.band}</span></td>
+      <td style="color:var(--muted)">${roles[c.band-1]}</td>
+      <td>${c.M}</td>
+      <td>${c.A}</td>
+    </tr>`).join('');
+}
+
+// ── STEP 2: Subset & Preview ───────────────────────────────────────────────────
+function updateSubsetInfo() {
+  const r0 = +document.getElementById('rowStart').value || 0;
+  const r1 = +document.getElementById('rowEnd').value   || 0;
+  const c0 = +document.getElementById('colStart').value || 0;
+  const c1 = +document.getElementById('colEnd').value   || 0;
+  const h = Math.max(0, r1 - r0), w = Math.max(0, c1 - c0);
+  const px = h * w;
+  const area = (px * 900 / 1e6).toFixed(1);
+  document.getElementById('si_size').textContent  = `${w.toLocaleString()} × ${h.toLocaleString()}`;
+  document.getElementById('si_px').textContent    = px.toLocaleString();
+  document.getElementById('si_area').textContent  = `${area} km²`;
+}
+
+// Show full dim info once metadata loaded
+function showDimInfo() {
+  if (!state.fullH) return;
+  document.getElementById('dimInfo').innerHTML = `
+    <div style="background:rgba(0,229,255,.05);border:1px solid rgba(0,229,255,.15);
+                border-radius:10px;padding:12px 16px;font-size:12px;color:var(--muted)">
+      Full image: <span style="color:var(--accent)">${state.fullW} × ${state.fullH}</span> pixels — 
+      Enter any row/col range within these bounds.
+    </div>`;
+}
+
+async function doPreview() {
+  const body = {
+    row_start: +document.getElementById('rowStart').value,
+    row_end:   +document.getElementById('rowEnd').value,
+    col_start: +document.getElementById('colStart').value,
+    col_end:   +document.getElementById('colEnd').value,
+  };
+
+  setLoading('previewLoading', true);
+  document.getElementById('previewResult').style.display = 'none';
+
+  try {
+    const res  = await fetch('/api/preview', {
+      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)
+    });
+    const data = await res.json();
+    if (!data.success) { alert(data.error); return; }
+
+    document.getElementById('previewRGB').src   = `data:image/png;base64,${data.preview_rgb}`;
+    document.getElementById('previewFalse').src = `data:image/png;base64,${data.preview_false}`;
+    document.getElementById('previewResult').style.display = 'block';
+  } catch(e) {
+    alert('Preview failed: ' + e.message);
+  } finally {
+    setLoading('previewLoading', false);
+  }
+}
+
+// ── STEP 3: Classify ───────────────────────────────────────────────────────────
+const classifyMsgs = [
+  'Loading raw DN values from 7 bands…',
+  'Applying radiometric calibration (DN → TOA)…',
+  'Computing NDVI, MNDWI, NDBI…',
+  'Building 10-feature stack (7 bands + 3 indices)…',
+  'Running ML classifier on all pixels…',
+  'Generating color-coded classification map…',
+];
+let msgInterval;
+
+async function doClassify() {
+  const err = document.getElementById('classifyErr');
+  err.classList.remove('show');
+
+  const fd = new FormData();
+  fd.append('row_start', document.getElementById('rowStart').value);
+  fd.append('row_end',   document.getElementById('rowEnd').value);
+  fd.append('col_start', document.getElementById('colStart').value);
+  fd.append('col_end',   document.getElementById('colEnd').value);
+  if (state.files.model) fd.append('model', state.files.model);
+
+  setLoading('classifyLoading', true);
+  document.getElementById('classifyBtn').disabled = true;
+
+  // Cycle through messages
+  let mi = 0;
+  const msgEl = document.getElementById('classifyMsg');
+  msgEl.textContent = classifyMsgs[0];
+  msgInterval = setInterval(() => {
+    mi = (mi + 1) % classifyMsgs.length;
+    msgEl.textContent = classifyMsgs[mi];
+  }, 2200);
+
+  try {
+    const res  = await fetch('/api/classify', {method:'POST', body:fd});
+    const data = await res.json();
+    if (!data.success) { showAlert(err, data.error); return; }
+
+    // Populate results
+    document.getElementById('classMap').src = `data:image/png;base64,${data.step4_map}`;
+    document.getElementById('ndviImg').src  = `data:image/png;base64,${data.step2_imgs.NDVI}`;
+    document.getElementById('ndwiImg').src  = `data:image/png;base64,${data.step2_imgs.MNDWI}`;
+    document.getElementById('ndbiImg').src  = `data:image/png;base64,${data.step2_imgs.NDBI}`;
+
+    const s = data.subset;
+    document.getElementById('subsetSummary').textContent =
+      `Subset: rows ${s.r0}–${s.r1}, cols ${s.c0}–${s.c1}  |  ` +
+      `${s.h}×${s.w} px  |  ${s.pixels.toLocaleString()} total pixels  |  ≈${s.area_km2} km²`;
+
+    renderStats(data.stats);
+    state.statsData = data.stats;
+    markNavDone(2); markNavDone(3);
+    gotoStep(4);
+  } catch(e) {
+    showAlert(err, 'Classification failed: ' + e.message);
+  } finally {
+    clearInterval(msgInterval);
+    setLoading('classifyLoading', false);
+    document.getElementById('classifyBtn').disabled = false;
+  }
+}
+
+function renderStats(stats) {
+  const tbody = document.getElementById('statsTbody');
+  tbody.innerHTML = stats.map(s => `
+    <tr>
+      <td>
+        <span class="class-dot" style="background:${s.color}"></span>
+        <strong>${s.class}</strong>
+      </td>
+      <td style="font-family:'Space Mono',monospace">${s.pixels.toLocaleString()}</td>
+      <td style="font-family:'Space Mono',monospace">${s.area_km2}</td>
+      <td style="font-family:'Space Mono',monospace">${s.pct}%</td>
+      <td class="bar-cell">
+        <div class="bar-bg">
+          <div class="bar-fill" style="width:${s.pct}%;background:${s.color}"></div>
+        </div>
+      </td>
+    </tr>`).join('');
+}
+
+async function downloadStats() {
+  if (!state.statsData) return;
+  const res = await fetch('/api/download_stats', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({stats: state.statsData})
+  });
+  const blob = await res.blob();
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = 'LULC_Stats.csv'; a.click();
+}
+
+// ── Utils ──────────────────────────────────────────────────────────────────────
+function setLoading(id, show) {
+  document.getElementById(id).style.display = show ? 'block' : 'none';
+}
+function showAlert(el, msg) {
+  el.textContent = msg; el.classList.add('show');
+}
+function markNavDone(n) {
+  const btn = document.getElementById(`nav${n}`);
+  btn.classList.remove('active'); btn.classList.add('done');
+}
+
+// Init subset info display
+updateSubsetInfo();
+
+// When moving to step 2, show dim info
+document.getElementById('nav2').addEventListener('click', showDimInfo);
+</script>
+</body>
+</html>
