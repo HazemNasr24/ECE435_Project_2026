@@ -279,14 +279,12 @@ h1{font-size:clamp(30px,5vw,58px);font-weight:800;line-height:1.08;margin-bottom
 <body>
 <div class="wrap">
 
-  <!-- Header -->
   <header>
     <div class="eyebrow"><span class="eyebrow-dot"></span>ECE 435 · Remote Sensing · Group 4</div>
     <h1>LULC Classification<br>Pipeline</h1>
     <p class="sub">Land Use / Land Cover mapping from Landsat 8 — Radiometric Calibration → Spectral Indices → Machine Learning Classification</p>
   </header>
 
-  <!-- Step navigation -->
   <nav class="steps-nav">
     <button class="step-btn active" onclick="gotoStep(1)" id="nav1">
       <span class="step-num">1</span>Upload &amp; Metadata
@@ -302,9 +300,6 @@ h1{font-size:clamp(30px,5vw,58px);font-weight:800;line-height:1.08;margin-bottom
     </button>
   </nav>
 
-  <!-- ════════════════════════════════════════════════════════ -->
-  <!--  STEP 1 — Upload                                        -->
-  <!-- ════════════════════════════════════════════════════════ -->
   <section class="step-section active" id="step1">
 
     <div class="card">
@@ -315,7 +310,6 @@ h1{font-size:clamp(30px,5vw,58px);font-weight:800;line-height:1.08;margin-bottom
 
       <div class="alert error" id="uploadErr"></div>
 
-      <!-- Band upload grid -->
       <div class="band-grid">
         <div class="band-item" id="drop_band1">
           <div class="band-drop" id="bd1">
@@ -380,7 +374,6 @@ h1{font-size:clamp(30px,5vw,58px);font-weight:800;line-height:1.08;margin-bottom
             <div class="file-ok">✓ Loaded</div>
           </div>
         </div>
-        <!-- MTL in last cell -->
         <div class="band-item" style="grid-column:span 1">
           <div class="band-drop" id="bdMTL" style="border-color:rgba(168,85,247,.4)">
             <input type="file" accept=".txt" onchange="markMTL(this)">
@@ -402,7 +395,6 @@ h1{font-size:clamp(30px,5vw,58px);font-weight:800;line-height:1.08;margin-bottom
       </div>
     </div>
 
-    <!-- Metadata result (hidden until upload) -->
     <div class="card" id="metaCard" style="display:none">
       <div class="card-header">
         <span class="card-tag" style="color:var(--green);background:rgba(34,197,94,.08);border-color:rgba(34,197,94,.2)">Metadata</span>
@@ -434,9 +426,6 @@ h1{font-size:clamp(30px,5vw,58px);font-weight:800;line-height:1.08;margin-bottom
     </div>
   </section>
 
-  <!-- ════════════════════════════════════════════════════════ -->
-  <!--  STEP 2 — Spatial Subset                                -->
-  <!-- ════════════════════════════════════════════════════════ -->
   <section class="step-section" id="step2">
     <div class="card">
       <div class="card-header">
@@ -512,9 +501,6 @@ h1{font-size:clamp(30px,5vw,58px);font-weight:800;line-height:1.08;margin-bottom
     </div>
   </section>
 
-  <!-- ════════════════════════════════════════════════════════ -->
-  <!--  STEP 3 — Classify                                      -->
-  <!-- ════════════════════════════════════════════════════════ -->
   <section class="step-section" id="step3">
     <div class="card">
       <div class="card-header">
@@ -528,7 +514,6 @@ h1{font-size:clamp(30px,5vw,58px);font-weight:800;line-height:1.08;margin-bottom
         The pipeline will run: TOA Calibration → NDVI / MNDWI / NDBI → 10-feature stack → Predict.
       </p>
 
-      <!-- Model upload -->
       <div class="model-row" id="modelRow">
         <input type="file" accept=".pkl" onchange="markModel(this)">
         <span style="font-size:24px">🧠</span>
@@ -539,7 +524,6 @@ h1{font-size:clamp(30px,5vw,58px);font-weight:800;line-height:1.08;margin-bottom
         <div class="model-ok">✓ Model ready</div>
       </div>
 
-      <!-- Pipeline steps visual -->
       <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:22px">
         <span class="pill">🛰 Load 7 Bands</span>
         <span style="color:var(--muted)">→</span>
@@ -571,12 +555,8 @@ h1{font-size:clamp(30px,5vw,58px);font-weight:800;line-height:1.08;margin-bottom
     </div>
   </section>
 
-  <!-- ════════════════════════════════════════════════════════ -->
-  <!--  STEP 4 — Results                                       -->
-  <!-- ════════════════════════════════════════════════════════ -->
   <section class="step-section" id="step4">
 
-    <!-- Classification map -->
     <div class="card">
       <div class="card-header">
         <span class="card-tag" style="color:var(--green);background:rgba(34,197,94,.08);border-color:rgba(34,197,94,.2)">Output</span>
@@ -588,7 +568,6 @@ h1{font-size:clamp(30px,5vw,58px);font-weight:800;line-height:1.08;margin-bottom
       <div id="subsetSummary" style="font-family:'Space Mono',monospace;font-size:11px;color:var(--muted)"></div>
     </div>
 
-    <!-- Stats table -->
     <div class="card">
       <div class="card-header">
         <span class="card-tag">Statistics</span>
@@ -610,7 +589,6 @@ h1{font-size:clamp(30px,5vw,58px);font-weight:800;line-height:1.08;margin-bottom
       <button class="btn btn-green" onclick="downloadStats()">⬇ Download Stats CSV</button>
     </div>
 
-    <!-- Spectral indices -->
     <div class="card">
       <div class="card-header">
         <span class="card-tag">Indices</span>
@@ -644,9 +622,7 @@ h1{font-size:clamp(30px,5vw,58px);font-weight:800;line-height:1.08;margin-bottom
     <button class="btn btn-outline" onclick="gotoStep(1)">← Start Over</button>
   </section>
 
-</div><!-- /wrap -->
-
-<script>
+</div><script>
 // ── State ──────────────────────────────────────────────────────────────────────
 const state = {
   files: {},          // { band1: File, ..., band7: File, mtl: File, model: File }
@@ -687,87 +663,239 @@ function markModel(input) {
 }
 
 // ── STEP 1: Upload ─────────────────────────────────────────────────────────────
-async function doUpload() {
-  const err = document.getElementById('uploadErr');
-  err.classList.remove('show');
+// ── STEP 1: Chunk Upload System ─────────────────────────────
 
-  for (let i=1; i<=7; i++) {
-    if (!state.files[`band${i}`]) {
-      showAlert(err, `Please select Band ${i} GeoTIFF`); return;
+const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB
+const MAX_RETRIES = 3;
+const PARALLEL_UPLOADS = 2;
+
+async function uploadFileInChunks(file, filename) {
+  const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+  const fileId = Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+  let uploadedChunks = 0;
+
+  async function uploadChunk(chunkIndex) {
+    const start = chunkIndex * CHUNK_SIZE;
+    const end = Math.min(start + CHUNK_SIZE, file.size);
+    const chunk = file.slice(start, end);
+    const fd = new FormData();
+
+    fd.append('chunk', chunk);
+    fd.append('filename', filename);
+    fd.append('chunkIndex', chunkIndex);
+    fd.append('totalChunks', totalChunks);
+    fd.append('fileId', fileId);
+
+    let retries = 0;
+    while (retries < MAX_RETRIES) {
+      try {
+        const res = await fetch('/api/upload_chunk', {
+          method: 'POST',
+          body: fd
+        });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error || 'Chunk upload failed');
+        
+        uploadedChunks++;
+        updateUploadProgress();
+        return;
+      } catch (err) {
+        retries++;
+        console.log(`Retrying chunk ${chunkIndex} (${retries})`);
+        await sleep(1000);
+      }
+    }
+    throw new Error(`Failed chunk ${chunkIndex}`);
+  }
+
+  let currentChunk = 0;
+  async function worker() {
+    while (currentChunk < totalChunks) {
+      const chunkToUpload = currentChunk++;
+      await uploadChunk(chunkToUpload);
     }
   }
-  if (!state.files.mtl) { showAlert(err, 'Please select MTL.txt'); return; }
 
-  const fd = new FormData();
-  for (let i=1; i<=7; i++) fd.append(`band${i}`, state.files[`band${i}`]);
-  fd.append('mtl', state.files.mtl);
+  const workers = [];
+  for (let i = 0; i < PARALLEL_UPLOADS; i++) {
+    workers.push(worker());
+  }
+
+  // انتظار رفع جميع الأجزاء بنجاح
+  await Promise.all(workers);
+
+  // تحديث واجهة المستخدم لإظهار حالة التجميع
+  const msg = document.querySelector('#uploadLoading .loading-msg');
+  msg.textContent = `Assembling ${filename}... Please wait.`;
+
+  // نداء السيرفر لتجميع الملف بعد التأكد من وصول كل الأجزاء
+  const assembleRes = await fetch('/api/assemble', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      filename: filename,
+      fileId: fileId,
+      totalChunks: totalChunks
+    })
+  });
+
+  const assembleData = await assembleRes.json();
+  if (!assembleData.success) {
+    throw new Error(assembleData.error || 'Assembly failed');
+  }
+
+  function updateUploadProgress() {
+    const percent = Math.floor((uploadedChunks / totalChunks) * 100);
+    const msg = document.querySelector('#uploadLoading .loading-msg');
+    msg.textContent = `Uploading ${filename} — ${percent}%`;
+  }
+}
+
+function sleep(ms) {
+  return new Promise(
+    resolve => setTimeout(resolve, ms)
+  );
+}
+
+async function doUpload() {
+  const err =
+    document.getElementById('uploadErr');
+
+  err.classList.remove('show');
+
+  // =====================================
+  // Validate Inputs
+  // =====================================
+
+  for (let i = 1; i <= 7; i++) {
+    if (!state.files[`band${i}`]) {
+      showAlert(
+        err,
+        `Please select Band ${i}`
+      );
+      return;
+    }
+  }
+
+  if (!state.files.mtl) {
+    showAlert(
+      err,
+      'Please select MTL.txt'
+    );
+    return;
+  }
+
+  // =====================================
+  // UI Loading
+  // =====================================
 
   setLoading('uploadLoading', true);
-  document.getElementById('uploadBtn').disabled = true;
+
+  document.getElementById(
+    'uploadBtn'
+  ).disabled = true;
 
   try {
-    const res = await fetch('/api/upload', {method:'POST', body:fd});
+
+    // =====================================
+    // Upload Bands
+    // =====================================
+
+    for (let i = 1; i <= 7; i++) {
+      await uploadFileInChunks(
+        state.files[`band${i}`],
+        `B${i}.tif`
+      );
+    }
+
+    // =====================================
+    // Upload MTL
+    // =====================================
+
+    await uploadFileInChunks(
+      state.files.mtl,
+      'MTL.txt'
+    );
+
+    // =====================================
+    // Finalize Upload
+    // =====================================
+
+    const res = await fetch(
+      '/api/upload',
+      {
+        method: 'POST'
+      }
+    );
+
     const data = await res.json();
-    if (!data.success) { showAlert(err, data.error); return; }
+
+    if (!data.success) {
+      showAlert(err, data.error);
+      return;
+    }
+
+    // =====================================
+    // Save State
+    // =====================================
 
     state.meta = data.meta;
     state.calibration = data.calibration;
     state.fullH = data.meta.full_height;
     state.fullW = data.meta.full_width;
 
-    // Populate metadata card
-    renderMeta(data.meta);
-    renderCalTable(data.calibration);
-    document.getElementById('metaCard').style.display = 'block';
+    // =====================================
+    // Render Metadata
+    // =====================================
 
-    // Update subset defaults to project spec or full image
-    document.getElementById('rowEnd').max = state.fullH;
-    document.getElementById('colEnd').max = state.fullW;
-    document.getElementById('rowEnd').value = Math.min(3000, state.fullH);
-    document.getElementById('colEnd').value = Math.min(3000, state.fullW);
+    // You need to define renderMeta and renderCalTable functions if they don't exist in your index.html
+    // Assuming they are defined elsewhere or you will add them.
+    if(typeof renderMeta === "function") renderMeta(data.meta);
+    if(typeof renderCalTable === "function") renderCalTable(data.calibration);
+
+    document.getElementById(
+      'metaCard'
+    ).style.display = 'block';
+
+    document.getElementById(
+      'rowEnd'
+    ).max = state.fullH;
+
+    document.getElementById(
+      'colEnd'
+    ).max = state.fullW;
+
+    document.getElementById(
+      'rowEnd'
+    ).value = Math.min(
+      3000,
+      state.fullH
+    );
+
+    document.getElementById(
+      'colEnd'
+    ).value = Math.min(
+      3000,
+      state.fullW
+    );
+
     updateSubsetInfo();
-
     markNavDone(1);
-  } catch(e) {
-    showAlert(err, 'Upload failed: ' + e.message);
+
+  } catch (e) {
+    showAlert(
+      err,
+      'Upload failed: ' + e.message
+    );
   } finally {
-    setLoading('uploadLoading', false);
-    document.getElementById('uploadBtn').disabled = false;
+    setLoading(
+      'uploadLoading',
+      false
+    );
+    document.getElementById(
+      'uploadBtn'
+    ).disabled = false;
   }
-}
-
-function renderMeta(m) {
-  const bandRoles = ['','Coastal/Aerosol','Blue','Green','Red','NIR','SWIR1','SWIR2'];
-  const grid = document.getElementById('metaGrid');
-  const items = [
-    ['Scene ID', m.scene_id],
-    ['Date Acquired', m.date],
-    ['Sensor', m.sensor],
-    ['WRS Path / Row', `${m.path} / ${m.row}`],
-    ['Sun Elevation', `${m.sun_elevation}°`],
-    ['Sun Azimuth', `${m.sun_azimuth}°`],
-    ['Cloud Cover', `${m.cloud_cover}%`],
-    ['CRS', m.crs],
-    ['Pixel Size', `${m.pixel_size_m} m`],
-    ['Full Dimensions', `${m.full_width} × ${m.full_height} px`],
-  ];
-  grid.innerHTML = items.map(([k,v]) => `
-    <div class="meta-item">
-      <div class="meta-key">${k}</div>
-      <div class="meta-val">${v ?? 'N/A'}</div>
-    </div>`).join('');
-}
-
-function renderCalTable(cal) {
-  const roles = ['Coastal/Aerosol','Blue','Green','Red','NIR','SWIR1','SWIR2'];
-  const tbody = document.querySelector('#calTable tbody');
-  tbody.innerHTML = cal.map(c => `
-    <tr>
-      <td><span class="band-pill">B${c.band}</span></td>
-      <td style="color:var(--muted)">${roles[c.band-1]}</td>
-      <td>${c.M}</td>
-      <td>${c.A}</td>
-    </tr>`).join('');
 }
 
 // ── STEP 2: Subset & Preview ───────────────────────────────────────────────────
