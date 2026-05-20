@@ -458,6 +458,7 @@ def api_classify():
         height = r1 - r0
         width = c1 - c0
 
+        # 1. قراءة وإعداد المودل
         model_file = request.files.get('model')
         if model_file:
             model = pickle.load(model_file)
@@ -468,11 +469,13 @@ def api_classify():
             with open(default_model_path, 'rb') as f:
                 model = pickle.load(f)
 
+        # 2. قراءة بيانات الـ MTL للحصول على معاملات الـ TOA Calibration
         mtl_path = os.path.join(UPLOAD_FOLDER, 'MTL.txt')
         with open(mtl_path, 'r', encoding='utf-8') as f:
             mtl_params = parse_mtl_full(f.read())
         sun_elev_rad = np.radians(mtl_params['sun_elev'])
 
+        # 3. قراءة الـ 7 نطاقات ومعايرتها (TOA Reflectance)
         bands_toa = []
         for b in range(1, 8):
             raw_band = get_band_crop(b, r0, r1, c0, c1)
@@ -483,27 +486,65 @@ def api_classify():
 
         B1, B2, B3, B4, B5, B6, B7 = bands_toa
 
+        # 4. حساب المؤشرات الطيفية وتأمين نوع البيانات (float32)
         np.seterr(divide='ignore', invalid='ignore')
-        ndvi = np.where((B5 + B4) == 0., 0, (B5 - B4) / (B5 + B4))
-        mndwi = np.where((B3 + B6) == 0., 0, (B3 - B6) / (B3 + B6))
-        ndbi = np.where((B6 + B5) == 0., 0, (B6 - B5) / (B6 + B5))
+        ndvi = np.where((B5 + B4) == 0., 0, (B5 - B4) / (B5 + B4)).astype(np.float32)
+        mndwi = np.where((B3 + B6) == 0., 0, (B3 - B6) / (B3 + B6)).astype(np.float32)
+        ndbi = np.where((B6 + B5) == 0., 0, (B6 - B5) / (B6 + B5)).astype(np.float32)
 
+        # 5. تجهيز البيانات للمودل (Stacking)
         features = np.dstack((B1, B2, B3, B4, B5, B6, B7, ndvi, mndwi, ndbi))
         X = features.reshape(-1, 10)
         X = np.nan_to_num(X, nan=0.0, posinf=0.0, neginf=0.0)
 
+        # 6. التنبؤ (Prediction)
         predictions = model.predict(X)
-        pred_map = predictions.reshape(height, width)
 
-        class_mapping = {
-            0: {'name': 'Water', 'color': '#0055FF'},
-            1: {'name': 'Vegetation', 'color': '#228B22'},
-            2: {'name': 'Built-up / Urban', 'color': '#E60000'},
-            3: {'name': 'Bare Soil / Desert', 'color': '#FFD700'}
-        }
+        # ========================================================
+        # حل مشكلة الـ dtype object والـ String Labels ديناميكياً
+        # ========================================================
+        if not np.issubdtype(predictions.dtype, np.number):
+            # الموديل يخرج نصوصاً (مثل كلمات 'Water', 'Vegetation'...)
+            unique_labels = sorted(list(np.unique(predictions)))
+            label_to_idx = {label: idx for idx, label in enumerate(unique_labels)}
+            
+            class_mapping = {}
+            default_colors = ['#0055FF', '#228B22', '#E60000', '#FFD700', '#964B00', '#808080']
+            
+            for idx, label in enumerate(unique_labels):
+                lbl_lower = str(label).lower()
+                color = default_colors[idx % len(default_colors)]
+                
+                # تخمين اللون المناسب بناءً على اسم الفئة المكتوب في الموديل
+                if 'wat' in lbl_lower: color = '#0055FF'
+                elif 'veg' in lbl_lower or 'forest' in lbl_lower or 'crop' in lbl_lower: color = '#228B22'
+                elif 'urb' in lbl_lower or 'built' in lbl_lower or 'build' in lbl_lower: color = '#E60000'
+                elif 'bar' in lbl_lower or 'soil' in lbl_lower or 'des' in lbl_lower: color = '#FFD700'
+                
+                class_mapping[idx] = {'name': str(label), 'color': color}
+                
+            # تحويل النصوص إلى أرقام صريحة (int32) لحل مشكلة الماتبلوتليب
+            numeric_predictions = np.array([label_to_idx[p] for p in predictions], dtype=np.int32)
+            pred_map = numeric_predictions.reshape(height, width)
+            unique, counts = np.unique(numeric_predictions, return_counts=True)
+            pred_counts = dict(zip(unique, counts))
+        else:
+            # الموديل يخرج أرقاماً عادية [0, 1, 2, 3]
+            predictions = predictions.astype(np.int32)
+            pred_map = predictions.reshape(height, width)
+            unique, counts = np.unique(predictions, return_counts=True)
+            pred_counts = dict(zip(unique, counts))
+            
+            class_mapping = {
+                0: {'name': 'Water', 'color': '#0055FF'},
+                1: {'name': 'Vegetation', 'color': '#228B22'},
+                2: {'name': 'Built-up / Urban', 'color': '#E60000'},
+                3: {'name': 'Bare Soil / Desert', 'color': '#FFD700'}
+            }
         
         cmap = mcolors.ListedColormap([c['color'] for c in class_mapping.values()])
         
+        # 7. توليد صور الـ Base64 للخريطة والمؤشرات
         def create_image(data, cmap_name, is_index=False):
             fig, ax = plt.subplots(figsize=(6, 6))
             if is_index:
@@ -518,13 +559,11 @@ def api_classify():
         mndwi_b64 = create_image(mndwi, 'Blues', is_index=True)
         ndbi_b64 = create_image(ndbi, 'YlOrBr', is_index=True)
 
+        # 8. حساب الإحصائيات والمساحات
         total_pixels = height * width
         pixel_area_km2 = (30 * 30) / 1_000_000 
         
         stats = []
-        unique, counts = np.unique(predictions, return_counts=True)
-        pred_counts = dict(zip(unique, counts))
-        
         for cls_val, cls_info in class_mapping.items():
             count = pred_counts.get(cls_val, 0)
             area = count * pixel_area_km2
@@ -556,7 +595,6 @@ def api_classify():
 
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
-
 # ==========================================
 # Download Stats Endpoint
 # ==========================================
