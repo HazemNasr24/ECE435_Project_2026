@@ -1,8 +1,21 @@
-__pycache__
-*.pyc
+# Git
 .git
-uploads
+.gitignore
+
+# Python Cache
+__pycache__/
+*.pyc
+
+# Project Folders (Mounted as Volumes)
+uploads/
+chunks/
+Outputs/
+
+# Large Media / Data Files
 *.tif
 *.tiff
 *.zip
 *.rar
+
+# Docker
+.dockerignore

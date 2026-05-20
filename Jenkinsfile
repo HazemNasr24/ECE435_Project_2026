@@ -18,7 +18,9 @@ pipeline {
         stage('Create Persistent Storage') {
             steps {
                 sh '''
+                # إضافة فولدر chunks
                 mkdir -p /opt/lulc/uploads
+                mkdir -p /opt/lulc/chunks
                 chmod -R 777 /opt/lulc
                 '''
             }
@@ -49,6 +51,7 @@ pipeline {
                     --restart always \
                     -p 5000:5000 \
                     -v /opt/lulc/uploads:/app/uploads \
+                    -v /opt/lulc/chunks:/app/chunks \
                     $IMAGE_NAME
                 '''
             }

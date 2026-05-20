@@ -38,9 +38,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # =========================
-# Create Uploads Folder
+# Create Uploads & Chunks Folders
 # =========================
-RUN mkdir -p uploads
+RUN mkdir -p uploads chunks
 
 # =========================
 # Expose Port
