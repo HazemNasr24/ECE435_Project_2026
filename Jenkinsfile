@@ -4,7 +4,6 @@ pipeline {
     environment {
         IMAGE_NAME = "lulc-classifier"
         CONTAINER_NAME = "lulc-app"
-        PORT = "5000"
     }
 
     stages {
@@ -16,9 +15,20 @@ pipeline {
             }
         }
 
+        stage('Create Persistent Storage') {
+            steps {
+                sh '''
+                mkdir -p /opt/lulc/uploads
+                chmod -R 777 /opt/lulc
+                '''
+            }
+        }
+
         stage('Build Docker Image') {
             steps {
-                sh 'docker build -t $IMAGE_NAME .'
+                sh '''
+                docker build -t $IMAGE_NAME .
+                '''
             }
         }
 
@@ -36,7 +46,9 @@ pipeline {
                 sh '''
                 docker run -d \
                     --name $CONTAINER_NAME \
+                    --restart always \
                     -p 5000:5000 \
+                    -v /opt/lulc/uploads:/app/uploads \
                     $IMAGE_NAME
                 '''
             }
@@ -44,8 +56,21 @@ pipeline {
 
         stage('Cleanup Docker') {
             steps {
-                sh 'docker image prune -f'
+                sh '''
+                docker image prune -f
+                '''
             }
+        }
+    }
+
+    post {
+
+        success {
+            echo 'Deployment Successful 🚀'
+        }
+
+        failure {
+            echo 'Deployment Failed ❌'
         }
     }
 }
