@@ -4,6 +4,7 @@ import io
 import base64
 import pickle
 import rasterio
+import rasterio.windows
 import numpy as np
 import pandas as pd
 import matplotlib
@@ -162,13 +163,20 @@ def normalize_rgb(r, g, b):
         (p98 - p2 + 1e-5)
     )
 
+def get_band_crop(band_num, r0, r1, c0, c1):
+    """Helper function to read a specific cropped window from a band."""
+    path = os.path.join(UPLOAD_FOLDER, f'B{band_num}.tif')
+    with rasterio.open(path) as src:
+        window = rasterio.windows.Window(col_off=c0, row_off=r0, width=c1-c0, height=r1-r0)
+        return src.read(1, window=window).astype(np.float32)
+
+
 # ==========================================
 # Routes
 # ==========================================
 
 @app.route('/')
 def index():
-
     return send_file('index.html')
 
 # ==========================================
@@ -400,5 +408,182 @@ def api_upload():
 
         }), 500
 
+# ==========================================
+# Core Processing Endpoints
+# ==========================================
+
+@app.route('/api/preview', methods=['POST'])
+def api_preview():
+    try:
+        data = request.get_json()
+        r0, r1 = int(data['row_start']), int(data['row_end'])
+        c0, c1 = int(data['col_start']), int(data['col_end'])
+
+        b2 = get_band_crop(2, r0, r1, c0, c1)
+        b3 = get_band_crop(3, r0, r1, c0, c1)
+        b4 = get_band_crop(4, r0, r1, c0, c1)
+        b5 = get_band_crop(5, r0, r1, c0, c1)
+
+        # 1. True Color
+        rgb = normalize_rgb(b4, b3, b2)
+        fig, ax = plt.subplots(figsize=(6, 6))
+        ax.imshow(rgb)
+        ax.axis('off')
+        preview_rgb = fig_to_base64(fig)
+
+        # 2. False Color
+        false_color = normalize_rgb(b5, b4, b3)
+        fig, ax = plt.subplots(figsize=(6, 6))
+        ax.imshow(false_color)
+        ax.axis('off')
+        preview_false = fig_to_base64(fig)
+
+        return jsonify({
+            'success': True,
+            'preview_rgb': preview_rgb,
+            'preview_false': preview_false
+        })
+
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/classify', methods=['POST'])
+def api_classify():
+    try:
+        r0 = int(request.form['row_start'])
+        r1 = int(request.form['row_end'])
+        c0 = int(request.form['col_start'])
+        c1 = int(request.form['col_end'])
+        height = r1 - r0
+        width = c1 - c0
+
+        model_file = request.files.get('model')
+        if model_file:
+            model = pickle.load(model_file)
+        else:
+            default_model_path = os.path.join(BASE_DIR, 'Outputs', 'best_model.pkl')
+            if not os.path.exists(default_model_path):
+                return jsonify({'success': False, 'error': 'No model uploaded and default model not found in Outputs/.'})
+            with open(default_model_path, 'rb') as f:
+                model = pickle.load(f)
+
+        mtl_path = os.path.join(UPLOAD_FOLDER, 'MTL.txt')
+        with open(mtl_path, 'r', encoding='utf-8') as f:
+            mtl_params = parse_mtl_full(f.read())
+        sun_elev_rad = np.radians(mtl_params['sun_elev'])
+
+        bands_toa = []
+        for b in range(1, 8):
+            raw_band = get_band_crop(b, r0, r1, c0, c1)
+            M = mtl_params['mult'].get(b, 2.0E-5)
+            A = mtl_params['add'].get(b, -0.1)
+            toa = (M * raw_band + A) / np.sin(sun_elev_rad)
+            bands_toa.append(toa)
+
+        B1, B2, B3, B4, B5, B6, B7 = bands_toa
+
+        np.seterr(divide='ignore', invalid='ignore')
+        ndvi = np.where((B5 + B4) == 0., 0, (B5 - B4) / (B5 + B4))
+        mndwi = np.where((B3 + B6) == 0., 0, (B3 - B6) / (B3 + B6))
+        ndbi = np.where((B6 + B5) == 0., 0, (B6 - B5) / (B6 + B5))
+
+        features = np.dstack((B1, B2, B3, B4, B5, B6, B7, ndvi, mndwi, ndbi))
+        X = features.reshape(-1, 10)
+        X = np.nan_to_num(X, nan=0.0, posinf=0.0, neginf=0.0)
+
+        predictions = model.predict(X)
+        pred_map = predictions.reshape(height, width)
+
+        class_mapping = {
+            0: {'name': 'Water', 'color': '#0055FF'},
+            1: {'name': 'Vegetation', 'color': '#228B22'},
+            2: {'name': 'Built-up / Urban', 'color': '#E60000'},
+            3: {'name': 'Bare Soil / Desert', 'color': '#FFD700'}
+        }
+        
+        cmap = mcolors.ListedColormap([c['color'] for c in class_mapping.values()])
+        
+        def create_image(data, cmap_name, is_index=False):
+            fig, ax = plt.subplots(figsize=(6, 6))
+            if is_index:
+                ax.imshow(data, cmap=cmap_name, vmin=-1, vmax=1)
+            else:
+                ax.imshow(data, cmap=cmap_name)
+            ax.axis('off')
+            return fig_to_base64(fig)
+
+        map_b64 = create_image(pred_map, cmap, is_index=False)
+        ndvi_b64 = create_image(ndvi, 'RdYlGn', is_index=True)
+        mndwi_b64 = create_image(mndwi, 'Blues', is_index=True)
+        ndbi_b64 = create_image(ndbi, 'YlOrBr', is_index=True)
+
+        total_pixels = height * width
+        pixel_area_km2 = (30 * 30) / 1_000_000 
+        
+        stats = []
+        unique, counts = np.unique(predictions, return_counts=True)
+        pred_counts = dict(zip(unique, counts))
+        
+        for cls_val, cls_info in class_mapping.items():
+            count = pred_counts.get(cls_val, 0)
+            area = count * pixel_area_km2
+            pct = (count / total_pixels) * 100 if total_pixels > 0 else 0
+            stats.append({
+                'class': cls_info['name'],
+                'color': cls_info['color'],
+                'pixels': int(count),
+                'area_km2': round(area, 2),
+                'pct': round(pct, 1)
+            })
+
+        return jsonify({
+            'success': True,
+            'step4_map': map_b64,
+            'step2_imgs': {
+                'NDVI': ndvi_b64,
+                'MNDWI': mndwi_b64,
+                'NDBI': ndbi_b64
+            },
+            'subset': {
+                'r0': r0, 'r1': r1, 'c0': c0, 'c1': c1,
+                'h': height, 'w': width,
+                'pixels': total_pixels,
+                'area_km2': round(total_pixels * pixel_area_km2, 2)
+            },
+            'stats': stats
+        })
+
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+# ==========================================
+# Download Stats Endpoint
+# ==========================================
+@app.route('/api/download_stats', methods=['POST'])
+def download_stats():
+    try:
+        data = request.get_json()
+        stats = data.get('stats', [])
+        
+        # Convert to DataFrame
+        df = pd.DataFrame(stats)
+        
+        # Create a CSV in memory
+        si = io.StringIO()
+        df.to_csv(si, index=False)
+        output = io.BytesIO()
+        output.write(si.getvalue().encode('utf-8'))
+        output.seek(0)
+        
+        return send_file(
+            output,
+            mimetype='text/csv',
+            as_attachment=True,
+            download_name='LULC_Stats.csv'
+        )
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    app.run(debug=True, host='0.0.0.0', port=5000)
